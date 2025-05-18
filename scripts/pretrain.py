@@ -1,4 +1,7 @@
-import argparse, yaml
+"""Entry point script for self-supervised pretraining."""
+
+import argparse
+import yaml
 from training.pretrain import run_pretraining
 
 if __name__ == '__main__':

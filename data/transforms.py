@@ -10,6 +10,14 @@ from monai.transforms import (
 
 
 def get_monai_augment(with_coarse: bool):
+    """Return a MONAI ``Compose`` with random 3D augmentations.
+
+    Parameters
+    ----------
+    with_coarse : bool
+        If ``True`` the pipeline will include a coarse dropout operation.
+    """
+
     aug = [
         RandFlipd("image", prob=0.5, spatial_axis=[0]),
         RandFlipd("image", prob=0.5, spatial_axis=[1]),
@@ -35,6 +43,21 @@ def get_monai_augment(with_coarse: bool):
 
 
 def build_transforms(mean, std):
+    """Create loading and augmentation transforms.
+
+    Parameters
+    ----------
+    mean, std : float
+        Values used to normalize the CT volumes.
+
+    Returns
+    -------
+    tuple
+        ``(load_tf, aug_v1, aug_v2)`` where ``load_tf`` loads and normalizes the
+        data, ``aug_v1`` applies moderate augmentation and ``aug_v2`` includes
+        coarse dropout.
+    """
+
     load_tf = Compose([
         LoadImaged("image", image_only=False, reader="ITKReader"),
         EnsureChannelFirstd("image", strict_check=False),
@@ -46,17 +69,23 @@ def build_transforms(mean, std):
 
 
 def random_rotation_single(vol: torch.Tensor):
-    axis = random.randint(0,2); k = random.randint(0,3)
-    dims_map = {0:(2,3), 1:(1,3), 2:(1,2)}
-    return torch.rot90(vol,k,dims=dims_map[axis]), axis*4+k
+    """Apply a random 90 degree rotation to ``vol``."""
+    axis = random.randint(0, 2)
+    k = random.randint(0, 3)
+    dims_map = {0: (2, 3), 1: (1, 3), 2: (1, 2)}
+    return torch.rot90(vol, k, dims=dims_map[axis]), axis * 4 + k
 
 def random_jigsaw_single(vol: torch.Tensor):
-    if random.random()<0.5:
-        perm = torch.randperm(vol.shape[1]); return vol[:,perm],1
-    return vol,0
+    """Randomly permute slices along the depth dimension."""
+    if random.random() < 0.5:
+        perm = torch.randperm(vol.shape[1])
+        return vol[:, perm], 1
+    return vol, 0
 
 def augment_batch(imgs: torch.Tensor, tf):
+    """Apply a MONAI transform to a batch of images."""
     return torch.stack([tf({"image": s})["image"] for s in imgs])
 
 def create_mask(shape, ratio, device):
+    """Create a boolean mask with ``ratio`` True entries."""
     return torch.rand(shape, device=device) < ratio

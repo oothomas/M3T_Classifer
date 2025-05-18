@@ -13,7 +13,9 @@ from data.transforms import build_transforms
 from data.dataset import NRRDDataset
 
 
-def generate_maps(cfg):
+def generate_maps(cfg: dict) -> None:
+    """Generate and save saliency maps for a dataset."""
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     tf = build_transforms(cfg['mean'], cfg['std'])[0]
     loader = DataLoader(NRRDDataset(cfg['data_list'], tf), batch_size=1, shuffle=False)
@@ -24,8 +26,11 @@ def generate_maps(cfg):
     model.eval(); [p.requires_grad_(False) for p in model.parameters()]
 
     def f_pma(x):
+        """Forward function for Captum that returns the logit difference."""
+
         with autocast(dtype=torch.float16):
-            l = model(x); return (l[:,1]-l[:,0]).unsqueeze(1)
+            logits = model(x)
+            return (logits[:, 1] - logits[:, 0]).unsqueeze(1)
 
     ig = IntegratedGradients(f_pma); nt = NoiseTunnel(ig)
     for b in tqdm(loader, desc='Saliency'):
