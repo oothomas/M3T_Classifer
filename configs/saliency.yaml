@@ -1,0 +1,13 @@
+mean: 1776.835584
+std: 5603.538718
+out_channels: 64
+emb_size: 256
+depth: 12
+p_cnn3d: 0.10
+p_feat: 0.20
+p_token: 0.10
+p_transformer: 0.10
+p_drop_path: 0.10
+ckpt: path/to/ckpt.pth
+data_list: []
+out_dir: saliency_out
