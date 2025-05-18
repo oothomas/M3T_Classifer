@@ -16,7 +16,9 @@ from monai.data import DataLoader
 from training.utils import cosine_warmup_schedule
 
 
-def run_pretraining(cfg):
+def run_pretraining(cfg: dict) -> None:
+    """Run BYOL pretraining with additional SSL objectives."""
+
     wandb.init(project=cfg['project'], config=cfg)
     run_dir = os.path.join("ssl_runs", wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)

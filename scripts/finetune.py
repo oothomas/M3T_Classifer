@@ -1,4 +1,7 @@
-import argparse, yaml
+"""Entry point script for classifier fine-tuning."""
+
+import argparse
+import yaml
 from training.finetune import run_finetuning
 
 if __name__ == '__main__':

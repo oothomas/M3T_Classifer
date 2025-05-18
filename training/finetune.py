@@ -15,7 +15,9 @@ from monai.data import DataLoader
 from training.utils import cosine_warmup_schedule
 
 
-def run_finetuning(cfg):
+def run_finetuning(cfg: dict) -> None:
+    """Fine-tune the encoder on labeled data for edema classification."""
+
     wandb.init(project=cfg['project'], config=cfg)
     run_dir = os.path.join('runs', wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)

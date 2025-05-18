@@ -1,4 +1,7 @@
-import argparse, yaml
+"""Entry point script for saliency map generation."""
+
+import argparse
+import yaml
 from saliency.generate_maps import generate_maps
 
 if __name__ == '__main__':
