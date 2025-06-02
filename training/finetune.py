@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.cuda.amp import autocast, GradScaler
-from torch.optim.lr_scheduler import CosineAnnealingLR
+# custom learning rate schedule
+from training.utils import cosine_warmup_schedule
 from tqdm import tqdm
 import wandb
 
@@ -12,7 +13,6 @@ from models.classifier import M3T_Edema, M3T_Exencephaly, M3T_Gli2
 from data.transforms import build_transforms
 from data.dataset import NRRDDataset
 from monai.data import DataLoader
-from training.utils import cosine_warmup_schedule
 
 
 def run_finetuning_edema(cfg: dict) -> None:
@@ -47,7 +47,6 @@ def run_finetuning_edema(cfg: dict) -> None:
             print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
-    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
     scaler    = GradScaler()
 
     counts = [0,0]
@@ -57,6 +56,9 @@ def run_finetuning_edema(cfg: dict) -> None:
     criterion = nn.CrossEntropyLoss(weight=w)
 
     for epoch in range(cfg['epochs']):
+        cur_lr = cosine_warmup_schedule(epoch, cfg)
+        for pg in optimizer.param_groups:
+            pg['lr'] = cur_lr
         model.train()
         tloss = tacc = n = 0
         pbar = tqdm(train_loader, desc=f"Train {epoch+1}/{cfg['epochs']}")
@@ -98,11 +100,8 @@ def run_finetuning_edema(cfg: dict) -> None:
         if (epoch+1) % cfg['save_every']==0:
             ckpt = dict(epoch=epoch+1,
                         model=model.state_dict(),
-                        opt=optimizer.state_dict(),
-                        scheduler=scheduler.state_dict())
+                        opt=optimizer.state_dict())
             torch.save(ckpt, os.path.join(run_dir, f"checkpoint_epoch{epoch+1:03d}.pth"))
-
-        scheduler.step()
     print(f"Training complete. Run dir: {run_dir}")
 
 
@@ -139,7 +138,6 @@ def run_finetuning_exencephaly(cfg: dict) -> None:
             print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
-    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
     scaler = GradScaler()
 
     counts = [0, 0]
@@ -149,6 +147,9 @@ def run_finetuning_exencephaly(cfg: dict) -> None:
     criterion = nn.CrossEntropyLoss(weight=w)
 
     for epoch in range(cfg['epochs']):
+        cur_lr = cosine_warmup_schedule(epoch, cfg)
+        for pg in optimizer.param_groups:
+            pg['lr'] = cur_lr
         model.train()
         tloss = tacc = n = 0
         pbar = tqdm(train_loader, desc=f"Train {epoch+1}/{cfg['epochs']}")
@@ -190,13 +191,10 @@ def run_finetuning_exencephaly(cfg: dict) -> None:
         if (epoch + 1) % cfg['save_every'] == 0:
             ckpt = dict(epoch=epoch + 1,
                         model=model.state_dict(),
-                        opt=optimizer.state_dict(),
-                        scheduler=scheduler.state_dict())
+                        opt=optimizer.state_dict())
             torch.save(ckpt,
                        os.path.join(run_dir,
                                     f"checkpoint_epoch{epoch + 1:03d}.pth"))
-
-        scheduler.step()
     print(f"Training complete. Run dir: {run_dir}")
 
 
@@ -233,7 +231,6 @@ def run_finetuning_gli2(cfg: dict) -> None:
             print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
-    scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
     scaler = GradScaler()
 
     counts = [0, 0]
@@ -243,6 +240,9 @@ def run_finetuning_gli2(cfg: dict) -> None:
     criterion = nn.CrossEntropyLoss(weight=w)
 
     for epoch in range(cfg['epochs']):
+        cur_lr = cosine_warmup_schedule(epoch, cfg)
+        for pg in optimizer.param_groups:
+            pg['lr'] = cur_lr
         model.train()
         tloss = tacc = n = 0
         pbar = tqdm(train_loader, desc=f"Train {epoch+1}/{cfg['epochs']}")
@@ -284,11 +284,8 @@ def run_finetuning_gli2(cfg: dict) -> None:
         if (epoch + 1) % cfg['save_every'] == 0:
             ckpt = dict(epoch=epoch + 1,
                         model=model.state_dict(),
-                        opt=optimizer.state_dict(),
-                        scheduler=scheduler.state_dict())
+                        opt=optimizer.state_dict())
             torch.save(ckpt,
                        os.path.join(run_dir,
                                     f"checkpoint_epoch{epoch + 1:03d}.pth"))
-
-        scheduler.step()
     print(f"Training complete. Run dir: {run_dir}")
