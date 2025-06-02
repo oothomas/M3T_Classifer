@@ -129,6 +129,7 @@ def main():
     ap.add_argument('--val-split', type=float, default=0.2,
                     help='Fraction of data used for validation')
     ap.add_argument('--seed', type=int, default=0, help='Random seed')
+    ap.add_argument('--ssl-ckpt', help='Path to SSL checkpoint relative to ckpt_dir')
     ap.add_argument('--output', help='Output config path')
     args = ap.parse_args()
 
@@ -145,6 +146,8 @@ def main():
     cfg['mean'] = mean
     cfg['std'] = std
     cfg['project'] = cfg.get('project', '')
+    if args.ssl_ckpt:
+        cfg['ssl_ckpt'] = args.ssl_ckpt
 
     out_path = args.output
     if not out_path:
