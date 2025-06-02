@@ -20,7 +20,8 @@ def run_pretraining(cfg: dict) -> None:
     """Run BYOL pretraining with additional SSL objectives."""
 
     wandb.init(project=cfg['project'], config=cfg)
-    run_dir = os.path.join("ssl_runs", wandb.run.name or wandb.run.id)
+    ckpt_root = cfg.get('ckpt_dir', 'checkpoints')
+    run_dir = os.path.join(ckpt_root, "ssl_runs", wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)
 
     load_tf, aug_v1, aug_v2 = build_transforms(cfg['mean'], cfg['std'])

@@ -1,4 +1,5 @@
 project: Embryo_Edema_Classification
+ckpt_dir: checkpoints
 mean: 1776.835584
 std: 5603.538718
 out_channels: 64

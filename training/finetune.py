@@ -19,7 +19,8 @@ def run_finetuning_edema(cfg: dict) -> None:
     """Fine-tune the encoder on labeled data for edema classification."""
 
     wandb.init(project=cfg['project'], config=cfg)
-    run_dir = os.path.join('runs', wandb.run.name or wandb.run.id)
+    ckpt_root = cfg.get('ckpt_dir', 'checkpoints')
+    run_dir = os.path.join(ckpt_root, 'runs', wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)
 
     train_tf, val_tf = build_transforms(cfg['mean'], cfg['std'])[:2]
@@ -36,10 +37,14 @@ def run_finetuning_edema(cfg: dict) -> None:
                                   'p_transformer','p_drop_path')}
     model = M3T_Edema(enc_cfg).to(device)
 
-    if cfg.get('ssl_ckpt') and os.path.isfile(cfg['ssl_ckpt']):
-        ckpt = torch.load(cfg['ssl_ckpt'], map_location='cpu')
-        msg  = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
-        print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
+    ssl_path = cfg.get('ssl_ckpt')
+    if ssl_path:
+        if not os.path.isabs(ssl_path):
+            ssl_path = os.path.join(ckpt_root, ssl_path)
+        if os.path.isfile(ssl_path):
+            ckpt = torch.load(ssl_path, map_location='cpu')
+            msg  = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
+            print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
     scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
@@ -105,7 +110,8 @@ def run_finetuning_exencephaly(cfg: dict) -> None:
     """Fine-tune the encoder for exencephaly classification."""
 
     wandb.init(project=cfg['project'], config=cfg)
-    run_dir = os.path.join('runs', wandb.run.name or wandb.run.id)
+    ckpt_root = cfg.get('ckpt_dir', 'checkpoints')
+    run_dir = os.path.join(ckpt_root, 'runs', wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)
 
     train_tf, val_tf = build_transforms(cfg['mean'], cfg['std'])[:2]
@@ -123,10 +129,14 @@ def run_finetuning_exencephaly(cfg: dict) -> None:
         'p_transformer', 'p_drop_path')}
     model = M3T_Exencephaly(enc_cfg).to(device)
 
-    if cfg.get('ssl_ckpt') and os.path.isfile(cfg['ssl_ckpt']):
-        ckpt = torch.load(cfg['ssl_ckpt'], map_location='cpu')
-        msg = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
-        print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
+    ssl_path = cfg.get('ssl_ckpt')
+    if ssl_path:
+        if not os.path.isabs(ssl_path):
+            ssl_path = os.path.join(ckpt_root, ssl_path)
+        if os.path.isfile(ssl_path):
+            ckpt = torch.load(ssl_path, map_location='cpu')
+            msg = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
+            print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
     scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])
@@ -194,7 +204,8 @@ def run_finetuning_gli2(cfg: dict) -> None:
     """Fine-tune the encoder for Gli2 classification."""
 
     wandb.init(project=cfg['project'], config=cfg)
-    run_dir = os.path.join('runs', wandb.run.name or wandb.run.id)
+    ckpt_root = cfg.get('ckpt_dir', 'checkpoints')
+    run_dir = os.path.join(ckpt_root, 'runs', wandb.run.name or wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)
 
     train_tf, val_tf = build_transforms(cfg['mean'], cfg['std'])[:2]
@@ -212,10 +223,14 @@ def run_finetuning_gli2(cfg: dict) -> None:
         'p_transformer', 'p_drop_path')}
     model = M3T_Gli2(enc_cfg).to(device)
 
-    if cfg.get('ssl_ckpt') and os.path.isfile(cfg['ssl_ckpt']):
-        ckpt = torch.load(cfg['ssl_ckpt'], map_location='cpu')
-        msg = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
-        print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
+    ssl_path = cfg.get('ssl_ckpt')
+    if ssl_path:
+        if not os.path.isabs(ssl_path):
+            ssl_path = os.path.join(ckpt_root, ssl_path)
+        if os.path.isfile(ssl_path):
+            ckpt = torch.load(ssl_path, map_location='cpu')
+            msg = model.encoder.load_state_dict(ckpt['encoder'], strict=False)
+            print(f"Loaded SSL weights with {len(msg.missing_keys)} missing keys")
 
     optimizer = optim.Adam(model.parameters(), lr=cfg['lr'])
     scheduler = CosineAnnealingLR(optimizer, T_max=cfg['epochs'])

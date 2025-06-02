@@ -21,7 +21,10 @@ def generate_maps(cfg: dict) -> None:
     loader = DataLoader(NRRDDataset(cfg['data_list'], tf), batch_size=1, shuffle=False)
 
     model = M3T_Edema(cfg).to(device)
-    ckpt = torch.load(cfg['ckpt'], map_location=device)
+    ckpt_path = cfg['ckpt']
+    if not os.path.isabs(ckpt_path):
+        ckpt_path = os.path.join(cfg.get('ckpt_dir', 'checkpoints'), ckpt_path)
+    ckpt = torch.load(ckpt_path, map_location=device)
     model.load_state_dict(ckpt['model'], strict=True)
     model.eval(); [p.requires_grad_(False) for p in model.parameters()]
 

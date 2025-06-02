@@ -12,6 +12,7 @@ for pretraining, finetuning and saliency map generation.
 - `saliency/` – utilities for generating saliency maps with Captum
 - `scripts/` – entry points that load a YAML config and launch a job
 - `configs/` – example configuration files
+- `checkpoints/` – default location for saved models
 
 ## Usage
 
@@ -25,7 +26,7 @@ python scripts/pretrain.py configs/pretrain.yaml
 ```
 
 Edit `configs/pretrain.yaml` so that `data_list` points to a list of training
-volumes. The script will save checkpoints under `ssl_runs/` and log metrics via
+volumes. The script will save checkpoints under `checkpoints/ssl_runs/` and log metrics via
 Weights & Biases.
 
 ### Finetuning on edema labels
@@ -47,3 +48,10 @@ python scripts/saliency.py configs/saliency.yaml
 Specify the classifier checkpoint via `ckpt` and the dataset list via
 `data_list`. Saliency maps will be written as NumPy arrays to the directory
 given in `out_dir`.
+
+### Checkpoints
+
+All training jobs write their outputs inside `checkpoints/`. Pretraining runs
+create a subfolder `ssl_runs/<run_id>` while finetuning creates
+`runs/<run_id>`. Configuration files may specify checkpoints relative to this
+directory via the `ckpt_dir` field.
