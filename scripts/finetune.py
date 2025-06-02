@@ -2,7 +2,7 @@
 
 import argparse
 import yaml
-from training.finetune import run_finetuning
+from training.finetune import run_finetuning_edema
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='Run classifier finetuning')
@@ -10,4 +10,4 @@ if __name__ == '__main__':
     args = ap.parse_args()
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
-    run_finetuning(cfg)
+    run_finetuning_edema(cfg)

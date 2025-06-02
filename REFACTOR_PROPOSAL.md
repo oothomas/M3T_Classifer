@@ -31,7 +31,7 @@ MT3_Classifier/
 │
 ├── training/
 │   ├── pretrain.py           # function `run_pretraining(config)`
-│   ├── finetune.py           # function `run_finetuning(config)`
+│   ├── finetune.py           # function `run_finetuning_edema(config)`
 │   └── utils.py              # lr_schedule and helper functions
 │
 ├── saliency/
