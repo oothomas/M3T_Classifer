@@ -1,7 +1,5 @@
 project: Embryo_Edema_Classification
 ckpt_dir: checkpoints
-mean: 1776.835584
-std: 5603.538718
 out_channels: 64
 emb_size: 256
 depth: 12
@@ -14,6 +12,4 @@ batch_size: 3
 epochs: 1000
 lr: 1e-4
 save_every: 5
-train_list: []
-val_list: []
 ssl_ckpt: null
