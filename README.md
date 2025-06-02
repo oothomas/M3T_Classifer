@@ -25,20 +25,24 @@ expects a path to one of these files.
 python scripts/pretrain.py configs/pretrain.yaml
 ```
 
-Edit `configs/pretrain.yaml` so that `data_list` points to a list of training
-volumes. The script will save checkpoints under `checkpoints/ssl_runs/` and log
-metrics via Weights & Biases.
+Edit `configs/pretrain.yaml` so that `data_list` points to your list of
+training volumes. The script writes checkpoints to
+`checkpoints/ssl_runs/<run_id>` and logs metrics via Weights & Biases. The final
+encoder weights can then be used for supervised finetuning.
 
 ### Finetuning on edema labels
 
+Finetuning configs are generated for each task. The file
+`configs/finetune.yaml` acts only as a base template and cannot be used
+directly. First create a task specific config (see below) and then run:
+
 ```bash
-python scripts/finetune.py configs/finetune.yaml
+python scripts/finetune.py configs/edema_finetune.yaml
 ```
 
-`configs/finetune.yaml` requires paths to the `train_list` and `val_list` JSON
-files. Optionally provide a pretrained checkpoint via `ssl_ckpt` to initialise
-the encoder weights.  Learning rates follow a cosine schedule with optional
-linear warmup controlled by `warmup_epochs`.
+The generated YAML contains the dataset lists and can optionally reference a
+self-supervised checkpoint through the `ssl_ckpt` field. Learning rates follow a
+cosine schedule with optional linear warmup controlled by `warmup_epochs`.
 
 ### Generating finetuning configs
 
@@ -52,11 +56,13 @@ python scripts/generate_configs.py \
     --task edema \
     --csv path/to/labels.csv \
     --data-dir /path/to/nrrd \
+    --ssl-ckpt ssl_runs/<run_id>/ssl_backbone_final.pth \
     --output configs/edema_finetune.yaml
 ```
 
-The generated configuration can be passed to `scripts/finetune.py` in place of
-`configs/finetune.yaml`.
+`--ssl-ckpt` should point to the pretraining checkpoint relative to
+`checkpoints/`. The resulting YAML can then be supplied to
+`scripts/finetune.py`.
 
 ### Saliency map generation
 
