@@ -11,5 +11,6 @@ p_drop_path: 0.10
 batch_size: 3
 epochs: 1000
 lr: 1e-4
+warmup_epochs: 0
 save_every: 5
 ssl_ckpt: null

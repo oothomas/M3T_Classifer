@@ -26,8 +26,8 @@ python scripts/pretrain.py configs/pretrain.yaml
 ```
 
 Edit `configs/pretrain.yaml` so that `data_list` points to a list of training
-volumes. The script will save checkpoints under `checkpoints/ssl_runs/` and log metrics via
-Weights & Biases.
+volumes. The script will save checkpoints under `checkpoints/ssl_runs/` and log
+metrics via Weights & Biases.
 
 ### Finetuning on edema labels
 
@@ -37,7 +37,25 @@ python scripts/finetune.py configs/finetune.yaml
 
 `configs/finetune.yaml` requires paths to the `train_list` and `val_list` JSON
 files. Optionally provide a pretrained checkpoint via `ssl_ckpt` to initialise
-the encoder weights.
+the encoder weights.  Learning rates follow a cosine schedule with optional
+linear warmup controlled by `warmup_epochs`.
+
+### Generating finetuning configs
+
+The script `scripts/generate_configs.py` can create a finetuning YAML file
+directly from a CSV table of sample labels. It scans a directory of NRRD files,
+splits the dataset and computes intensity statistics.
+
+```bash
+python scripts/generate_configs.py \
+    --task edema \
+    --csv path/to/labels.csv \
+    --data-dir /path/to/nrrd \
+    --output configs/edema_finetune.yaml
+```
+
+The generated configuration can be passed to `scripts/finetune.py` in place of
+`configs/finetune.yaml`.
 
 ### Saliency map generation
 
