@@ -4,6 +4,12 @@ import glob
 import random
 import yaml
 import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from monai.transforms import (
+    Compose, LoadImaged, EnsureChannelFirstd, Orientationd, ToTensord
+)
+from monai.data import Dataset
 
 
 def str2bool(val):
@@ -61,6 +67,34 @@ def split_data(items, val_split, seed=0):
     return train_list, val_list
 
 
+def compute_stats(items):
+    """Compute global mean and std of the given dataset list."""
+
+    tf = Compose([
+        LoadImaged("image", image_only=False, reader="ITKReader"),
+        EnsureChannelFirstd("image", strict_check=False),
+        Orientationd("image", axcodes="SAR"),
+        ToTensord("image")
+    ])
+    ds = Dataset(data=items, transform=tf)
+
+    running_sum = 0.0
+    running_sq_sum = 0.0
+    voxel_count = 0
+
+    for i in tqdm(range(len(ds)), desc="Computing mean/std"):
+        vol = ds[i]["image"].float()
+        v = vol.view(-1)
+        running_sum += float(v.sum())
+        running_sq_sum += float((v ** 2).sum())
+        voxel_count += v.numel()
+
+    mean = running_sum / voxel_count
+    var = (running_sq_sum / voxel_count) - mean ** 2
+    std = float(np.sqrt(var))
+    return float(mean), std
+
+
 def main():
     ap = argparse.ArgumentParser(description='Generate finetuning config')
     ap.add_argument('--task', required=True, choices=['edema', 'exencephaly', 'gli2'],
@@ -79,9 +113,14 @@ def main():
     items = build_datalist(args.csv, args.data_dir, args.task)
     train_list, val_list = split_data(items, args.val_split, args.seed)
 
+    mean, std = compute_stats(train_list)
+    print(f"Computed mean: {mean:.4f} | std: {std:.4f}")
+
     cfg['train_list'] = train_list
     cfg['val_list'] = val_list
     cfg['val_split'] = args.val_split
+    cfg['mean'] = mean
+    cfg['std'] = std
     cfg['project'] = cfg.get('project', '')
 
     out_path = args.output
