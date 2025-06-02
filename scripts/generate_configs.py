@@ -60,10 +60,33 @@ def build_datalist(csv_path, data_dir, task):
 
 
 def split_data(items, val_split, seed=0):
-    random.Random(seed).shuffle(items)
-    val_count = int(len(items) * val_split)
-    val_list = items[:val_count]
-    train_list = items[val_count:]
+    """Split items into train/val sets while keeping class balance."""
+
+    if not items:
+        return [], []
+
+    label_key = next((k for k in items[0] if k.startswith("label_")), None)
+    rng = random.Random(seed)
+
+    if label_key is None:
+        rng.shuffle(items)
+        val_count = int(len(items) * val_split)
+        return items[val_count:], items[:val_count]
+
+    grouped = {}
+    for item in items:
+        grouped.setdefault(item[label_key], []).append(item)
+
+    train_list = []
+    val_list = []
+    for _, subset in grouped.items():
+        rng.shuffle(subset)
+        val_count = int(round(len(subset) * val_split))
+        val_list.extend(subset[:val_count])
+        train_list.extend(subset[val_count:])
+
+    rng.shuffle(train_list)
+    rng.shuffle(val_list)
     return train_list, val_list
 
 

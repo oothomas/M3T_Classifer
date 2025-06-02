@@ -44,7 +44,8 @@ linear warmup controlled by `warmup_epochs`.
 
 The script `scripts/generate_configs.py` can create a finetuning YAML file
 directly from a CSV table of sample labels. It scans a directory of NRRD files,
-splits the dataset and computes intensity statistics.
+splits the dataset with a **stratified** shuffle to preserve class ratios and
+computes intensity statistics.
 
 ```bash
 python scripts/generate_configs.py \
