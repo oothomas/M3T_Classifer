@@ -1,4 +1,3 @@
-project: Embryo_Edema_Classification
 ckpt_dir: checkpoints
 out_channels: 64
 emb_size: 256
@@ -14,3 +13,4 @@ lr: 1e-4
 warmup_epochs: 0
 save_every: 5
 ssl_ckpt: null
+
