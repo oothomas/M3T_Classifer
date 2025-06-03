@@ -122,6 +122,7 @@ def main():
     ap = argparse.ArgumentParser(description='Generate finetuning config')
     ap.add_argument('--task', required=True, choices=['edema', 'exencephaly', 'gli2'],
                     help='Target classification task')
+    ap.add_argument('--project', help='Weights & Biases project name')
     ap.add_argument('--csv', required=True, help='CSV file with labels')
     ap.add_argument('--data-dir', required=True, help='Directory with NRRD volumes')
     ap.add_argument('--base-config', default=os.path.join('configs', 'finetune.yaml'),
@@ -134,6 +135,7 @@ def main():
     args = ap.parse_args()
 
     cfg = load_base_config(args.base_config)
+    cfg['task'] = args.task
     items = build_datalist(args.csv, args.data_dir, args.task)
     train_list, val_list = split_data(items, args.val_split, args.seed)
 
@@ -145,7 +147,10 @@ def main():
     cfg['val_split'] = args.val_split
     cfg['mean'] = mean
     cfg['std'] = std
-    cfg['project'] = cfg.get('project', '')
+    if args.project:
+        cfg['project'] = args.project
+    else:
+        cfg['project'] = f'Embryo_{args.task}_Classification'
     if args.ssl_ckpt:
         cfg['ssl_ckpt'] = args.ssl_ckpt
 
