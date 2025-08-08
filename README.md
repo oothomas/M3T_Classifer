@@ -14,6 +14,20 @@ for pretraining, finetuning and saliency map generation.
 - `configs/` – example configuration files
 - `checkpoints/` – default location for saved models
 
+## Environment setup
+
+This repository requires Python 3.10 and a number of packages such as
+PyTorch and MONAI. The easiest way to get started is to create the
+included conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate m3t
+```
+
+This installs PyTorch, MONAI, SimpleITK, SciPy and supporting imaging libraries
+like scikit-image and NiBabel required by the training and saliency scripts.
+
 ## Usage
 
 The project is configured through YAML files located in `configs/`. Each script
