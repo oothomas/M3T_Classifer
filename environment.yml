@@ -1,0 +1,23 @@
+name: m3t
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - numpy
+  - pandas
+  - pyyaml
+  - tqdm
+  - scipy
+  - scikit-image
+  - nibabel
+  - pillow
+  - pip
+  - pip:
+      - monai
+      - einops
+      - wandb
+      - captum
+      - SimpleITK
