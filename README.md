@@ -84,3 +84,10 @@ All training jobs write their outputs inside `checkpoints/`. Pretraining runs
 create a subfolder `ssl_runs/<run_id>` while finetuning creates
 `runs/<run_id>`. Configuration files may specify checkpoints relative to this
 directory via the `ckpt_dir` field.
+
+## Citation
+
+If you use this repository, please cite:
+
+- Vishnu Vardhan Reddy Kanamata Reddy. *M3T*. DOI: 10.5281/zenodo.11204469.
+- Jang, J., & Hwang, D. (2022). M3T: three-dimensional medical image classifier using multi-plane and multi-slice transformer. In *Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition* (pp. 20718–20729).
