@@ -1,0 +1,26 @@
+name: monai_env_cpu
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - git
+  - ninja
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - torchaudio=2.5.1
+  - pandas
+  - pyyaml
+  - tqdm
+  - scipy
+  - scikit-image
+  - nibabel
+  - pillow
+  - einops
+  - wandb
+  - captum
+  - simpleitk
+  - pip:
+      - "monai[all] @ git+https://github.com/Project-MONAI/MONAI.git"
