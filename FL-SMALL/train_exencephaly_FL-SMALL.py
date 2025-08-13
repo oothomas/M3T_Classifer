@@ -362,7 +362,7 @@ def main():
         config=dict(
             learning_rate=1e-4,
             epochs=300,
-            batch_size=6,
+            batch_size=4,
             resize=(144, 144, 144),
             out_channels=64,
             emb_size=128,
