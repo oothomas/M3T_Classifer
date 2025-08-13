@@ -107,7 +107,7 @@ seed of the FL-SMALL model described in the preprint. To run it:
 1. Download the masked and labelled 144³ µCT cubes from the Box archive and
    extract them into `FL-SMALL/masked_cubes144_labeled_nrrd`:
 
-   https://app.box.com/s/uqkmfq5y821j91h0106ok0goxqq7fjbq
+   [Masked NRRDs](https://app.box.com/s/fykcqtt8yixv95jgb0f5sgpv6gfhpcjo)
 
 2. Ensure the environment has been created and activate it:
 
@@ -115,10 +115,10 @@ seed of the FL-SMALL model described in the preprint. To run it:
    conda activate m3t
    ```
 
-3. Launch the training script with a chosen seed (e.g. `0`):
+3. Launch the training script with a chosen seed (e.g. `42`):
 
    ```bash
-   python FL-SMALL/train_exencephaly_FL-SMALL.py --seed 0
+   python FL-SMALL/train_exencephaly_FL-SMALL.py --seed 42
    ```
 
 The script reads volumes from `FL-SMALL/masked_cubes144_labeled_nrrd`, creates
