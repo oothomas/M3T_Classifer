@@ -382,7 +382,8 @@ def main():
         f.write(str(SEED))
 
     # ------------------------- dataset file list -------------------
-    folder = "FL-SMALL/masked_cubes144_labeled_nrrd"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    folder = os.path.join(base_dir, "masked_cubes144_labeled_nrrd")
     rx = re.compile(r"(Scan_\d{4}).*?_(\d+)_([A-Za-z0-9]+)_(\w+)\.nrrd$")
     emap = {"FALSE":0,"False":0,"0":0,"TRUE":1,"True":1,"1":1}
     raw = []
@@ -396,7 +397,7 @@ def main():
         raise RuntimeError("No NRRDs found.")
 
     # ------------------------- train/val split ---------------------
-    splits_dir = "FL-SMALL/splits"
+    splits_dir = os.path.join(base_dir, "splits")
     os.makedirs(splits_dir, exist_ok=True)
     tr_file  = os.path.join(splits_dir, f"exencephaly_train_idx_seed{SEED}.npy")
     val_file = os.path.join(splits_dir, f"exencephaly_val_idx_seed{SEED}.npy")

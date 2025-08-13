@@ -99,6 +99,35 @@ create a subfolder `ssl_runs/<run_id>` while finetuning creates
 `runs/<run_id>`. Configuration files may specify checkpoints relative to this
 directory via the `ckpt_dir` field.
 
+### Training the FL-SMALL exencephaly model
+
+The directory `FL-SMALL/` contains a standalone script for training a single
+seed of the FL-SMALL model described in the preprint. To run it:
+
+1. Download the masked and labelled 144³ µCT cubes from the Box archive and
+   extract them into `FL-SMALL/masked_cubes144_labeled_nrrd`:
+
+   [Masked NRRDs](https://app.box.com/s/fykcqtt8yixv95jgb0f5sgpv6gfhpcjo)
+
+2. Ensure the environment has been created and activate it:
+
+   ```bash
+   conda activate m3t
+   ```
+
+3. Launch the training script with a chosen seed (e.g. `42`):
+
+   ```bash
+   python FL-SMALL/train_exencephaly_FL-SMALL.py --seed 42
+   ```
+
+The script reads volumes from `FL-SMALL/masked_cubes144_labeled_nrrd`, creates
+or reuses a train/validation split under `FL-SMALL/splits`, and logs the run via
+Weights & Biases. Checkpoints and training curves are written to
+`runs/<timestamp>_<wandb_id>` alongside a `seed.txt` file containing the random
+seed. Subsequent runs with different seeds will generate their own split files
+and run directories.
+
 ## Citation
 
 If you use this repository, please cite:
