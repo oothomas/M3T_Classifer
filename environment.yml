@@ -24,7 +24,7 @@ dependencies:
   - pillow
   - einops
   - wandb
-  - captum
   - simpleitk
   - pip:
+      - captum>=0.7
       - "monai[all] @ git+https://github.com/Project-MONAI/MONAI.git"
