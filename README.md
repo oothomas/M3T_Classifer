@@ -13,6 +13,7 @@ for pretraining, finetuning and saliency map generation.
 - `scripts/` – entry points that load a YAML config and launch a job
 - `configs/` – example configuration files
 - `checkpoints/` – default location for saved models
+- `FL-SMALL/` – folder contained self-contained script for FL-SMALL model training
 
 ## Environment setup
 
