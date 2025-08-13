@@ -361,7 +361,7 @@ def main():
         project="Embryo_Exencephaly_Classification_144_Masked_BALANCED",
         config=dict(
             learning_rate=1e-4,
-            epochs=1000,
+            epochs=300,
             batch_size=6,
             resize=(144, 144, 144),
             out_channels=64,
@@ -382,7 +382,7 @@ def main():
         f.write(str(SEED))
 
     # ------------------------- dataset file list -------------------
-    folder = "masked_cubes144_labeled_nrrd"
+    folder = "FL-SMALL/masked_cubes144_labeled_nrrd"
     rx = re.compile(r"(Scan_\d{4}).*?_(\d+)_([A-Za-z0-9]+)_(\w+)\.nrrd$")
     emap = {"FALSE":0,"False":0,"0":0,"TRUE":1,"True":1,"1":1}
     raw = []
@@ -396,7 +396,7 @@ def main():
         raise RuntimeError("No NRRDs found.")
 
     # ------------------------- train/val split ---------------------
-    splits_dir = "/data/hps/home/othoma/magalab/user/othoma/Gli2_classifier/splits"
+    splits_dir = "FL-SMALL/splits"
     os.makedirs(splits_dir, exist_ok=True)
     tr_file  = os.path.join(splits_dir, f"exencephaly_train_idx_seed{SEED}.npy")
     val_file = os.path.join(splits_dir, f"exencephaly_val_idx_seed{SEED}.npy")
