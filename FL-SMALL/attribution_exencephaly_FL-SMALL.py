@@ -1,32 +1,46 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Deterministic Integrated?Gradients saliency for binary exencephaly
-(fp16 version, IG n_steps=128, SmoothGrad ?=0.03)
+Deterministic Integrated Gradients saliency for binary exencephaly.
 
-Produces TWO saliency maps per correctly classified scan:
-  ? ZERO?baseline map
-  ? BLUR?baseline map (3?D average?blurred baseline)
+This script generates saliency maps for correctly classified scans using
+Integrated Gradients with SmoothGrad. Two attribution maps are produced
+for each scan:
+
+* ``ZERO`` baseline map.
+* ``BLUR`` baseline map computed from a 3D average-blurred baseline.
+
+The model runs in mixed precision (fp16) for performance.
 """
+
 # --------------------------------------------------------------------------
 # Imports
 # --------------------------------------------------------------------------
-import os, re, glob, random, argparse, numpy as np, torch, torch.nn as nn
-from torch.utils.data import DataLoader
-from tqdm import tqdm
+import argparse
+import glob
+import os
+import random
+import re
+
+import numpy as np
 import SimpleITK as sitk
+import torch
+import torch.nn as nn
+import torch.nn.functional as F  # 3D average blurring
+import torchvision.models as models
+from captum.attr import IntegratedGradients, NoiseTunnel
+from einops import rearrange, repeat
 from monai.data import Dataset
 from monai.transforms import (
-    Compose, LoadImaged, EnsureChannelFirstd, Orientationd,
-    NormalizeIntensityd, EnsureTyped
+    Compose,
+    EnsureChannelFirstd,
+    EnsureTyped,
+    LoadImaged,
+    NormalizeIntensityd,
+    Orientationd,
 )
-import torchvision.models as models
-from einops import rearrange, repeat
-from captum.attr import IntegratedGradients, NoiseTunnel
-import torch.nn.functional as F                        # 3?D average blurring
-# ==================== ADDED / CHANGED ====================
-from torch.cuda.amp import autocast                    # enable fp16 autocast
-# =========================================================
+from torch.cuda.amp import autocast  # enable fp16 autocast
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 # --------------------------------------------------------------------------
 # CLI
@@ -65,36 +79,46 @@ OUT_DIR = os.path.join("maps_small_updated", RUN_ID)
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # --------------------------------------------------------------------------
-# Model definition  (unchanged)
+# Model definition
 # --------------------------------------------------------------------------
+
 class DropPath(nn.Module):
+    """Stochastic depth layer that randomly drops residual paths."""
+
     def __init__(self, p: float = 0.0):
-        super().__init__(); self.p = float(p)
+        super().__init__()
+        self.p = float(p)
+
     def forward(self, x):
         if self.p == 0.0 or not self.training:
             return x
         keep = 1.0 - self.p
-        shape = (x.shape[0],) + (1,)*(x.ndim-1)
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
         rnd = keep + torch.rand(shape, dtype=x.dtype, device=x.device)
         rnd.floor_()
         return x.div(keep) * rnd
 
 class CNN3DBlock(nn.Module):
+    """Two-layer 3D convolutional block with dropout."""
+
     def __init__(self, in_ch=1, out_ch=64, p=0.10):
         super().__init__()
         self.conv1 = nn.Conv3d(in_ch, out_ch, 5, padding=2)
-        self.bn1   = nn.BatchNorm3d(out_ch)
+        self.bn1 = nn.BatchNorm3d(out_ch)
         self.relu1 = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv3d(out_ch, out_ch, 5, padding=2)
-        self.bn2   = nn.BatchNorm3d(out_ch)
+        self.bn2 = nn.BatchNorm3d(out_ch)
         self.relu2 = nn.ReLU(inplace=True)
-        self.drop  = nn.Dropout3d(p)
+        self.drop = nn.Dropout3d(p)
+
     def forward(self, x):
         x = self.relu1(self.bn1(self.conv1(x)))
         x = self.relu2(self.bn2(self.conv2(x)))
         return self.drop(x)
 
 class MultiPlane_MultiSlice_Extract_Project(nn.Module):
+    """Extract multi-plane 2D features and project them to embeddings."""
+
     def __init__(self, out_ch=64, p=0.20, emb_size=128):
         super().__init__()
         weights = models.ResNet50_Weights.DEFAULT
@@ -102,120 +126,183 @@ class MultiPlane_MultiSlice_Extract_Project(nn.Module):
         self.CNN_2D.conv1 = nn.Conv2d(out_ch, 64, 7, 2, 3, bias=False)
         self.CNN_2D.fc = nn.Identity()
         self.feat_drop = nn.Dropout(p)
-        self.proj = nn.Sequential(nn.Linear(2048, 512), nn.ReLU(),
-                                  nn.Linear(512, emb_size))
+        self.proj = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.ReLU(),
+            nn.Linear(512, emb_size),
+        )
+
     def forward(self, t3d):
         B, C, D, H, W = t3d.shape
         cor = torch.cat(torch.split(t3d, 1, 2), 2)
         sag = torch.cat(torch.split(t3d, 1, 3), 3)
         axi = torch.cat(torch.split(t3d, 1, 4), 4)
-        S = torch.cat(((cor*t3d).permute(0,2,1,3,4),
-                       (sag*t3d).permute(0,3,1,2,4),
-                       (axi*t3d).permute(0,4,1,2,3)), 1).view(-1, C, H, W)
+        S = torch.cat(
+            (
+                (cor * t3d).permute(0, 2, 1, 3, 4),
+                (sag * t3d).permute(0, 3, 1, 2, 4),
+                (axi * t3d).permute(0, 4, 1, 2, 3),
+            ),
+            1,
+        ).view(-1, C, H, W)
         f2d = self.CNN_2D(S).view(B, -1, 2048)
         return self.proj(self.feat_drop(f2d))
 
 class EmbeddingLayer(nn.Module):
+    """Add class tokens, plane embeddings, and positional embeddings."""
+
     def __init__(self, e=128, total_tokens=432, p_tok=0.10):
         super().__init__()
-        self.cls_token      = nn.Parameter(torch.randn(1,1,e))
-        self.sep_token      = nn.Parameter(torch.randn(1,1,e))
-        self.coronal_plane  = nn.Parameter(torch.randn(1,e))
-        self.sagittal_plane = nn.Parameter(torch.randn(1,e))
-        self.axial_plane    = nn.Parameter(torch.randn(1,e))
-        self.positions      = nn.Parameter(torch.randn(total_tokens+4, e))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, e))
+        self.sep_token = nn.Parameter(torch.randn(1, 1, e))
+        self.coronal_plane = nn.Parameter(torch.randn(1, e))
+        self.sagittal_plane = nn.Parameter(torch.randn(1, e))
+        self.axial_plane = nn.Parameter(torch.randn(1, e))
+        self.positions = nn.Parameter(torch.randn(total_tokens + 4, e))
         self.p_tok = p_tok
+
     def forward(self, t):
         B, T, _ = t.shape
         tp = T // 3
         cls = repeat(self.cls_token, '1 1 e -> b 1 e', b=B)
         sep = repeat(self.sep_token, '1 1 e -> b 1 e', b=B)
-        x = torch.cat([cls,
-                       t[:, :tp], sep,
-                       t[:, tp:2*tp], sep,
-                       t[:, 2*tp:], sep], 1)
+        x = torch.cat([
+            cls,
+            t[:, :tp], sep,
+            t[:, tp:2 * tp], sep,
+            t[:, 2 * tp:], sep,
+        ], 1)
         cor_end = 1 + tp + 1
         sag_end = cor_end + tp + 1
-        x[:,      :cor_end]   += self.coronal_plane
+        x[:, :cor_end] += self.coronal_plane
         x[:, cor_end:sag_end] += self.sagittal_plane
-        x[:, sag_end:]        += self.axial_plane
+        x[:, sag_end:] += self.axial_plane
         if self.training and self.p_tok > 0:
             keep = torch.rand(B, x.size(1), device=x.device) > self.p_tok
-            keep[:, 0]  = True
+            keep[:, 0] = True
             keep[:, -1] = True
             x = x * keep.unsqueeze(-1)
         return x + self.positions
 
 class MultiHeadAttention(nn.Module):
+    """Multi-head self-attention layer."""
+
     def __init__(self, e=128, h=4, p=0.10):
         super().__init__()
         self.e, self.h = e, h
-        self.qkv  = nn.Linear(e, 3*e)
+        self.qkv = nn.Linear(e, 3 * e)
         self.proj = nn.Linear(e, e)
         self.drop = nn.Dropout(p)
+
     def forward(self, x):
-        qkv = rearrange(self.qkv(x),
-                        'b n (h d qkv) -> qkv b h n d',
-                        h=self.h, qkv=3)
+        qkv = rearrange(
+            self.qkv(x),
+            'b n (h d qkv) -> qkv b h n d',
+            h=self.h,
+            qkv=3,
+        )
         q, k, v = qkv
-        att = torch.softmax((q @ k.transpose(-2, -1)) / (self.e**0.5), -1)
+        att = torch.softmax((q @ k.transpose(-2, -1)) / (self.e ** 0.5), -1)
         out = rearrange(self.drop(att) @ v, 'b h n d -> b n (h d)')
         return self.proj(out)
 
 class ResidualAdd(nn.Module):
+    """Utility module for residual connections."""
+
     def __init__(self, fn):
-        super().__init__(); self.fn = fn
-    def forward(self, x): return x + self.fn(x)
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x):
+        return x + self.fn(x)
 
 class FeedForward(nn.Sequential):
+    """Transformer feed-forward network."""
+
     def __init__(self, e=128, exp=2, p=0.10):
-        super().__init__(nn.Linear(e, exp*e), nn.GELU(), nn.Dropout(p),
-                         nn.Linear(exp*e, e))
+        super().__init__(
+            nn.Linear(e, exp * e),
+            nn.GELU(),
+            nn.Dropout(p),
+            nn.Linear(exp * e, e),
+        )
 
 class TransformerEncoderBlock(nn.Module):
+    """Transformer encoder block with stochastic depth."""
+
     def __init__(self, e=128, p=0.10, dp=0.10):
         super().__init__()
-        self.dp1 = DropPath(dp); self.dp2 = DropPath(dp)
-        self.res1 = ResidualAdd(nn.Sequential(nn.LayerNorm(e),
-                                              MultiHeadAttention(e, p=p),
-                                              nn.Dropout(p)))
-        self.res2 = ResidualAdd(nn.Sequential(nn.LayerNorm(e),
-                                              FeedForward(e, p=p),
-                                              nn.Dropout(p)))
+        self.dp1 = DropPath(dp)
+        self.dp2 = DropPath(dp)
+        self.res1 = ResidualAdd(
+            nn.Sequential(
+                nn.LayerNorm(e),
+                MultiHeadAttention(e, p=p),
+                nn.Dropout(p),
+            )
+        )
+        self.res2 = ResidualAdd(
+            nn.Sequential(
+                nn.LayerNorm(e),
+                FeedForward(e, p=p),
+                nn.Dropout(p),
+            )
+        )
+
     def forward(self, x):
         x = x + self.dp1(self.res1.fn(x))
         x = x + self.dp2(self.res2.fn(x))
         return x
 
 class TransformerEncoder(nn.Module):
+    """Stack of transformer encoder blocks."""
+
     def __init__(self, depth=4, e=128, p=0.10, dp=0.10):
         super().__init__()
         import numpy as _np
+
         dpr = _np.linspace(0, dp, depth)
-        self.blocks = nn.ModuleList([TransformerEncoderBlock(e, p, dpr[i])
-                                     for i in range(depth)])
+        self.blocks = nn.ModuleList(
+            [TransformerEncoderBlock(e, p, dpr[i]) for i in range(depth)]
+        )
+
     def forward(self, x):
         for blk in self.blocks:
             x = blk(x)
         return x
 
 class ExencephalyHead(nn.Module):
+    """Classification head outputting logits for two classes."""
+
     def __init__(self, e=128):
         super().__init__()
         self.lin = nn.Linear(e, 2)
+
     def forward(self, x):
         return self.lin(x[:, 0])
 
 class M3T_Exencephaly(nn.Module):
-    def __init__(self, in_ch=1, out_ch=64, e=128, depth=4,
-                 p_cnn3d=0.10, p_feat=0.20, p_tok=0.10,
-                 p_trans=0.10, p_dp=0.10):
+    """Full model combining CNN backbone, transformer encoder, and head."""
+
+    def __init__(
+        self,
+        in_ch=1,
+        out_ch=64,
+        e=128,
+        depth=4,
+        p_cnn3d=0.10,
+        p_feat=0.20,
+        p_tok=0.10,
+        p_trans=0.10,
+        p_dp=0.10,
+    ):
         super().__init__()
-        self.cnn3d  = CNN3DBlock(in_ch, out_ch, p_cnn3d)
+        self.cnn3d = CNN3DBlock(in_ch, out_ch, p_cnn3d)
         self.project = MultiPlane_MultiSlice_Extract_Project(out_ch, p_feat, e)
-        self.embed  = EmbeddingLayer(e, total_tokens=432, p_tok=p_tok)
-        self.trans  = TransformerEncoder(depth, e, p_trans, p_dp)
-        self.head   = ExencephalyHead(e)
+        self.embed = EmbeddingLayer(e, total_tokens=432, p_tok=p_tok)
+        self.trans = TransformerEncoder(depth, e, p_trans, p_dp)
+        self.head = ExencephalyHead(e)
+
     def forward(self, x):
         x = self.cnn3d(x)
         x = self.project(x)
@@ -227,32 +314,52 @@ class M3T_Exencephaly(nn.Module):
 # Utilities
 # --------------------------------------------------------------------------
 class NRrdDataset(Dataset):
+    """MONAI dataset that also records the source file path."""
+
     def __getitem__(self, idx):
         s = super().__getitem__(idx)
         s["src_path"] = s["image_meta_dict"]["filename_or_obj"]
         return s
 
+
 def compute_accuracy(logits, labels):
+    """Compute classification accuracy."""
+
     return (logits.argmax(1) == labels).float().mean().item()
 
+
 def normalize_map(a):
+    """Normalize an attribution map by its mean absolute value."""
+
     m = np.mean(np.abs(a))
     return a / m if m > 0 else a
 
+
 def _to_sitk(x):
+    """Ensure the input is a SimpleITK image."""
+
     return x if isinstance(x, sitk.Image) else sitk.ReadImage(x)
 
+
 def _save_vol_like(arr, ref, path):
+    """Save a numpy volume while preserving the reference metadata."""
+
     img = sitk.GetImageFromArray(arr.astype(np.float32))
     img.CopyInformation(_to_sitk(ref))
     sitk.WriteImage(img, str(path))
 
+
 def _save_map_like(arr, ref, path):
+    """Save a normalized saliency map with reference metadata."""
+
     img = sitk.GetImageFromArray(normalize_map(arr).astype(np.float32))
     img.CopyInformation(_to_sitk(ref))
     sitk.WriteImage(img, str(path))
 
+
 def _unwrap_attr(o):
+    """Unwrap Captum outputs to obtain the raw tensor."""
+
     while isinstance(o, (tuple, list)):
         o = o[0]
     return o
@@ -261,6 +368,8 @@ def _unwrap_attr(o):
 # Main
 # --------------------------------------------------------------------------
 def main():
+    """Entry point for generating saliency maps."""
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # ---------- dataset ---------------------------------------------------
@@ -290,8 +399,9 @@ def main():
 
     # ---------- Captum ----------------------------------------------------
     def f_pma(x):
-        """Present?minus?Absent logit difference (fp16)."""
-        with autocast(dtype=torch.float16):                       # fp16
+        """Logit difference (Present minus Absent) computed in fp16."""
+
+        with autocast(dtype=torch.float16):  # fp16
             logits = model(x)
             return (logits[:, 1] - logits[:, 0]).unsqueeze(1)
 
@@ -324,7 +434,7 @@ def main():
             logits = model(x)
         pred = int(logits.argmax())
 
-        if pred != true_lbl:      # only analyse correct predictions
+        if pred != true_lbl:      # only analyze correct predictions
             continue
         correct_ids.append(sid)
 
@@ -333,7 +443,7 @@ def main():
         if not os.path.exists(p_raw):
             _save_vol_like(x[0, 0].detach().cpu().numpy(), src, p_raw)
 
-        # Construct blurred baseline (15?voxel avg pool, fp16)
+        # Construct blurred baseline (15-voxel average pool, fp16)
         blur_bl = F.avg_pool3d(x.detach(), kernel_size=15, stride=1, padding=7)
 
         # ---------- ZERO baseline attribution -------------------
