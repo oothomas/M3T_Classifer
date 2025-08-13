@@ -1,4 +1,4 @@
-# MT3_Classifier
+# MT3 Classifier
 
 This repository contains a modular implementation of the 3-plane CNN + Transformer
 pipeline for embryonic CT analysis. The code is organised into reusable modules
